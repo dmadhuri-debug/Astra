@@ -1,0 +1,311 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASTRA AI</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:radial-gradient(circle at top,#172554,#080d20 55%,#020617);
+ color:white;font-family:Arial,sans-serif;min-height:100vh;
+}
+header{
+ padding:18px;display:flex;justify-content:space-between;
+ align-items:center;border-bottom:1px solid #ffffff18;
+}
+.logo{font-size:24px;font-weight:bold;letter-spacing:3px;color:#67e8f9}
+.status{font-size:12px;color:#86efac}
+main{max-width:650px;margin:auto;padding:18px}
+.hero{text-align:center;padding:20px 0}
+.orb{
+ width:155px;height:155px;border-radius:50%;margin:10px auto 22px;
+ background:radial-gradient(circle at 35% 30%,#fff,#67e8f9 10%,#2563eb 40%,#111827 72%);
+ box-shadow:0 0 25px #38bdf8,0 0 65px #2563eb80;
+ position:relative;animation:float 3s ease-in-out infinite;
+}
+.orb:before,.orb:after{
+ content:"";position:absolute;inset:-13px;border-radius:50%;
+ border:2px solid #38bdf880;animation:spin 7s linear infinite;
+}
+.orb:after{inset:-24px;border-color:#818cf866;animation-direction:reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes float{50%{transform:translateY(-9px)}}
+.orb.listening{box-shadow:0 0 35px #4ade80,0 0 90px #22c55e}
+h1{font-size:30px;margin:0}
+.subtitle{color:#94a3b8;font-size:13px;margin-top:8px}
+#state{color:#67e8f9;margin-top:14px;font-size:14px}
+.chat{
+ height:300px;overflow-y:auto;background:#ffffff09;
+ border:1px solid #ffffff18;border-radius:18px;padding:14px;
+}
+.msg{padding:12px 14px;margin:9px 0;border-radius:14px;
+ line-height:1.5;font-size:14px;white-space:pre-wrap}
+.user{background:#1d4ed8;margin-left:35px}
+.bot{background:#172554;margin-right:25px}
+.controls{display:flex;gap:9px;margin-top:12px}
+input,select{
+ background:#111c35;color:white;border:1px solid #334155;
+ border-radius:12px;padding:13px;font-size:14px;min-width:0;
+}
+input{flex:1;width:100%}
+button{
+ border:0;border-radius:12px;padding:13px 16px;
+ background:#2563eb;color:white;font-weight:bold;font-size:14px;
+}
+button:active{transform:scale(.96)}
+.mic{background:#0891b2;font-size:20px}
+.voice-row{display:flex;gap:9px;margin-top:10px}
+.voice-row button{flex:1}
+.settings{margin-top:15px;display:flex;gap:10px}
+.settings select{flex:1}
+.small{font-size:11px;color:#94a3b8;text-align:center;margin-top:18px}
+</style>
+</head>
+<body>
+<header>
+ <div class="logo">✦ ASTRA AI</div>
+ <div class="status">● ONLINE</div>
+</header>
+
+<main>
+ <section class="hero">
+  <div class="orb" id="orb"></div>
+  <h1>ASTRA</h1>
+  <div class="subtitle">YOUR PERSONAL AI ASSISTANT</div>
+  <div id="state">Ready for your command</div>
+ </section>
+
+ <div class="chat" id="chat">
+  <div class="msg bot">Hello! I am Astra. Your personal AI assistant. You can talk to me or give me voice commands. ✨</div>
+ </div>
+
+ <div class="controls">
+  <input id="message" placeholder="Ask Astra anything..." autocomplete="off">
+  <button onclick="sendMessage()">SEND</button>
+ </div>
+
+ <div class="voice-row">
+  <button class="mic" onclick="startListening()">🎙️ Speak</button>
+  <button onclick="stopSpeaking()">🔇 Stop voice</button>
+ </div>
+
+ <div class="settings">
+  <select id="language">
+   <option value="en-IN">English</option>
+   <option value="hi-IN">हिन्दी</option>
+   <option value="mr-IN">मराठी</option>
+  </select>
+  <button onclick="clearChat()">Clear chat</button>
+ </div>
+
+ <div class="small">
+  ASTRA AI 2.0 • Made for your personal use
+ </div>
+</main>
+
+<script>
+const API="https://text.pollinations.ai/openai";
+const MODEL="openai-fast";
+
+const chat=document.getElementById("chat");
+const input=document.getElementById("message");
+const state=document.getElementById("state");
+const orb=document.getElementById("orb");
+const language=document.getElementById("language");
+
+let history=[];
+let recognition=null;
+let speakingEnabled=true;
+
+function addMessage(text,type){
+ const div=document.createElement("div");
+ div.className="msg "+type;
+ div.textContent=text;
+ chat.appendChild(div);
+ chat.scrollTop=chat.scrollHeight;
+}
+
+function setState(text){
+ state.textContent=text;
+}
+
+function speak(text){
+ if(!speakingEnabled || !("speechSynthesis" in window))return;
+ speechSynthesis.cancel();
+ const utterance=new SpeechSynthesisUtterance(text);
+ utterance.lang=language.value;
+ utterance.rate=1;
+ utterance.pitch=1;
+ speechSynthesis.speak(utterance);
+}
+
+function stopSpeaking(){
+ if("speechSynthesis" in window)speechSynthesis.cancel();
+}
+
+function clearChat(){
+ history=[];
+ chat.innerHTML="";
+ localStorage.removeItem("astraHistory");
+ addMessage("Chat cleared. What shall we do next?","bot");
+}
+
+function openWebsite(url){
+ window.open(url,"_blank");
+}
+
+function runCommand(text){
+ const t=text.toLowerCase().trim();
+
+ if(t==="open youtube" || t==="youtube"){
+  openWebsite("https://www.youtube.com");
+  return "Opening YouTube.";
+ }
+ if(t==="open google" || t==="google"){
+  openWebsite("https://www.google.com");
+  return "Opening Google.";
+ }
+ if(t.includes("open instagram")){
+  openWebsite("https://www.instagram.com");
+  return "Opening Instagram.";
+ }
+ if(t.includes("open whatsapp")){
+  openWebsite("https://web.whatsapp.com");
+  return "Opening WhatsApp Web.";
+ }
+ if(t.includes("open chatgpt")){
+  openWebsite("https://chatgpt.com");
+  return "Opening ChatGPT.";
+ }
+
+ let query=null;
+ const patterns=[
+  /^search for (.+)/i,
+  /^search (.+)/i,
+  /^google (.+)/i,
+  /^find (.+)/i,
+  /^look up (.+)/i
+ ];
+ for(const p of patterns){
+  const match=text.match(p);
+  if(match){query=match[1];break;}
+ }
+ if(query){
+  openWebsite("https://www.google.com/search?q="+encodeURIComponent(query));
+  return "Searching Google for "+query;
+ }
+
+ if(t.startsWith("open ")){
+  let site=t.replace("open ","").trim();
+  if(!site.includes("."))site=site+".com";
+  if(!/^https?:\/\//i.test(site))site="https://"+site;
+  openWebsite(site);
+  return "Opening "+site;
+ }
+ return null;
+}
+
+async function sendMessage(){
+ const text=input.value.trim();
+ if(!text)return;
+ input.value="";
+ addMessage(text,"user");
+
+ const command=runCommand(text);
+ if(command){
+  addMessage(command,"bot");
+  speak(command);
+  return;
+ }
+
+ history.push({role:"user",content:text});
+ setState("Astra is thinking...");
+ orb.style.opacity=".7";
+
+ const lang=language.value==="mr-IN"?"Marathi":
+ language.value==="hi-IN"?"Hindi":"English";
+
+ const systemMessage={
+  role:"system",
+  content:"You are ASTRA, a friendly and intelligent personal AI assistant. Answer clearly and naturally. Reply in "+lang+". You can help with questions, ideas and everyday tasks. Never claim to have performed a device action unless it actually happened."
+ };
+
+ try{
+  const response=await fetch(API,{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({
+    model:MODEL,
+    messages:[systemMessage,...history.slice(-12)],
+    temperature:0.7,
+    stream:false
+   })
+  });
+
+  if(!response.ok)throw new Error("Server error: "+response.status);
+
+  const data=await response.json();
+  const answer=data.choices?.[0]?.message?.content;
+
+  if(!answer)throw new Error("No answer received");
+
+  history.push({role:"assistant",content:answer});
+  addMessage(answer,"bot");
+  speak(answer);
+  setState("Ready for your next command");
+
+ }catch(error){
+  addMessage("I couldn't connect to my AI brain. Please check your internet and try again. ("+error.message+")","bot");
+  setState("Connection problem");
+ }
+ orb.style.opacity="1";
+}
+
+function startListening(){
+ const SpeechRecognition=window.SpeechRecognition ||
+                         window.webkitSpeechRecognition;
+
+ if(!SpeechRecognition){
+  addMessage("Voice recognition is not supported here. Try opening Astra in Chrome.","bot");
+  return;
+ }
+
+ if(recognition)recognition.abort();
+
+ recognition=new SpeechRecognition();
+ recognition.lang=language.value;
+ recognition.continuous=false;
+ recognition.interimResults=false;
+
+ recognition.onstart=()=>{
+  setState("🎙️ Listening...");
+  orb.classList.add("listening");
+ };
+
+ recognition.onresult=(event)=>{
+  const result=event.results[0][0].transcript;
+  input.value=result;
+  setState("Command received");
+  sendMessage();
+ };
+
+ recognition.onerror=(event)=>{
+  setState("Microphone: "+event.error);
+ };
+
+ recognition.onend=()=>{
+  orb.classList.remove("listening");
+  if(state.textContent==="🎙️ Listening...")
+   setState("Ready for your command");
+ };
+
+ recognition.start();
+}
+
+input.addEventListener("keydown",e=>{
+ if(e.key==="Enter")sendMessage();
+});
+</script>
+</body>
+</html>
